@@ -675,50 +675,51 @@ function openLightbox(url) {
 }
 
 /* --- 13. DOWNLOAD & SHARE LOGIC --- */
-function downloadAllSnapshots() {
-    if (autoSnapshots.length === 0) { showToast("No images to download."); return; }
+/* --- 13. DOWNLOAD & SHARE LOGIC (ZIP VERSION) --- */
+async function downloadAllSnapshots() {
+    // Check if we actually have images to zip
+    if (autoSnapshots.length === 0) { 
+        showToast("No images to download."); 
+        return; 
+    }
+
     const statusEl = document.getElementById('download-status');
-    if(statusEl) statusEl.innerText = "[Downloading in process...]";
-
-    autoSnapshots.forEach((snap, i) => {
-        setTimeout(() => {
-            const link = document.createElement('a');
-            link.href = snap.url;
-            link.download = `Jewels-AI-Look-${i + 1}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            if (i === autoSnapshots.length - 1) {
-                setTimeout(() => {
-                    if(statusEl) statusEl.innerText = "[Successfully Downloaded]";
-                    showToast("All looks saved!");
-                }, 1000);
-            }
-        }, i * 500);
-    });
-}
-
-async function shareAllSnapshots() {
-    if (!navigator.share) { showToast("Sharing not supported on this device."); return; }
-    const statusEl = document.getElementById('download-status');
-    if(statusEl) statusEl.innerText = "[Preparing files for sharing...]";
+    if(statusEl) statusEl.innerText = "[Zipping your lookbook...]";
+    showToast("Preparing your ZIP file...");
 
     try {
-        const files = [];
-        for (let i = 0; i < autoSnapshots.length; i++) {
-            const res = await fetch(autoSnapshots[i].url);
-            const blob = await res.blob();
-            files.push(new File([blob], `Jewel-Look-${i + 1}.png`, { type: 'image/png' }));
-        }
-        await navigator.share({ title: 'My Jewels-AI Collection', files: files });
-        if(statusEl) statusEl.innerText = "";
+        // Initialize the ZIP library
+        const zip = new JSZip();
+        const folder = zip.folder("My-Jewels-Lookbook");
+
+        // Add each captured snapshot to the ZIP folder
+        autoSnapshots.forEach((snap, i) => {
+            // We strip the Data URL header to get the raw base64 string
+            const imageData = snap.url.split(',')[1];
+            folder.file(`Jewels-Look-${i + 1}.png`, imageData, {base64: true});
+        });
+
+        // Generate the ZIP file as a 'blob'
+        const content = await zip.generateAsync({type: "blob"});
+        
+        // Create a single download link for the ZIP
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = `Jewels-AI-Lookbook-${Date.now()}.zip`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        if(statusEl) statusEl.innerText = "[Download Complete]";
+        showToast("Lookbook saved as ZIP! ♾️");
+
     } catch (err) {
-        showToast("Share failed. Try Download All.");
+        console.error("ZIP Generation Error:", err);
+        showToast("Error creating ZIP. Try sharing instead.");
         if(statusEl) statusEl.innerText = "";
     }
 }
-
 /* --- HELPER FUNCTIONS --- */
 function closePreview() { document.getElementById('preview-modal').style.display = 'none'; }
 function closeGallery() { document.getElementById('gallery-modal').style.display = 'none'; }
